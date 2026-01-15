@@ -86,11 +86,11 @@ Open your browser and navigate to:
 
 ### Admin Access
 - **Email:** admin@pharmacy.com
-- **Password:** password123
+- **Password:** password
 
 ### Customer Access
 - **Email:** john.doe@email.com
-- **Password:** password123
+- **Password:** password
 
 ## Project Structure
 
