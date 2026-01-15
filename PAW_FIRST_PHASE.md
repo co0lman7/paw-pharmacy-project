@@ -9,6 +9,8 @@
 3. [User Journeys](#3-user-journeys)
 4. [Activity Diagrams](#4-activity-diagrams)
 
+5. [Database Design](#5-database-design)
+
 ---
 
 ## 1. Website Objectives
@@ -754,6 +756,410 @@ Phase                          | Week 1 | Week 2 | Week 3 | Week 4 | Week 5 | We
                                                                              ┌─────────────────┐
                                                                              │      End        │
                                                                              └─────────────────┘
+```
+
+---
+
+## 5. Database Design
+
+### 5.1 Entity-Relationship (ER) Schema
+
+The ER diagram represents the conceptual design of the PharmaCare database, identifying entities, their attributes, and relationships.
+
+#### 5.1.1 ER Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                     PHARMACARE ER DIAGRAM                                           │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────┐                                    ┌───────────────────────┐
+    │        USERS          │                                    │      CATEGORIES       │
+    ├───────────────────────┤                                    ├───────────────────────┤
+    │ • id (PK)             │                                    │ • id (PK)             │
+    │ • email (UNIQUE)      │                                    │ • name                │
+    │ • password            │                                    │ • slug (UNIQUE)       │
+    │ • first_name          │                                    │ • description         │
+    │ • last_name           │                                    │ • image               │
+    │ • phone               │                                    └───────────┬───────────┘
+    │ • address             │                                                │
+    │ • role                │                                                │ 1
+    │ • created_at          │                                                │
+    └───────────┬───────────┘                                                │
+                │                                                            │ contains
+                │ 1                                                          │
+                │                                                            │ M
+                │ places                                    ┌───────────────────────────────┐
+                │                                          │          PRODUCTS             │
+                │ M                                        ├───────────────────────────────┤
+    ┌───────────────────────┐                              │ • id (PK)                     │
+    │        ORDERS         │                              │ • category_id (FK)            │
+    ├───────────────────────┤                              │ • name                        │
+    │ • id (PK)             │                              │ • slug (UNIQUE)               │
+    │ • user_id (FK)        │                              │ • description                 │
+    │ • total_amount        │                              │ • price                       │
+    │ • status              │                              │ • stock_quantity              │
+    │ • shipping_address    │                              │ • image                       │
+    │ • prescription_file   │                              │ • requires_prescription       │
+    │ • notes               │                              │ • dosage_info                 │
+    │ • created_at          │                              │ • is_active                   │
+    └───────────┬───────────┘                              │ • created_at                  │
+                │                                          └───────────────┬───────────────┘
+                │ 1                                                        │
+                │                                                          │ 1
+                │ contains                                                 │
+                │                                        ┌─────────────────┴─────────────────┐
+                │ M                                      │                                   │
+    ┌───────────────────────┐                           M│                                   │M
+    │     ORDER_ITEMS       │                  ┌─────────────────────┐          ┌─────────────────────┐
+    ├───────────────────────┤                  │      CART           │          │    ORDER_ITEMS      │
+    │ • id (PK)             │                  ├─────────────────────┤          │    (referenced)     │
+    │ • order_id (FK)       │                  │ • id (PK)           │          └─────────────────────┘
+    │ • product_id (FK)     │ ←────────────────│ • user_id (FK)      │
+    │ • quantity            │                  │ • session_id        │
+    │ • unit_price          │                  │ • product_id (FK)   │
+    └───────────────────────┘                  │ • quantity          │
+                                               │ • created_at        │
+              ┌────────────────────────────────└─────────────────────┘
+              │ M
+              │
+              │ has
+              │
+              │ 0..1
+    ┌─────────────────────┐
+    │       USERS         │
+    │     (optional)      │
+    └─────────────────────┘
+```
+
+#### 5.1.2 Entity Descriptions
+
+| Entity | Description | Key Attributes |
+|--------|-------------|----------------|
+| **USERS** | Represents customers and administrators | id (PK), email, password, role |
+| **CATEGORIES** | Product categories for organization | id (PK), name, slug |
+| **PRODUCTS** | Items available for sale | id (PK), category_id (FK), name, price, stock_quantity |
+| **ORDERS** | Customer purchase transactions | id (PK), user_id (FK), total_amount, status |
+| **ORDER_ITEMS** | Line items within an order | id (PK), order_id (FK), product_id (FK), quantity |
+| **CART** | Shopping cart items (temporary storage) | id (PK), user_id (FK)/session_id, product_id (FK) |
+
+#### 5.1.3 Relationships
+
+| Relationship | Entities | Cardinality | Description |
+|--------------|----------|-------------|-------------|
+| **places** | USERS → ORDERS | 1:M | One user can place many orders |
+| **contains** | ORDERS → ORDER_ITEMS | 1:M | One order contains many order items |
+| **references** | ORDER_ITEMS → PRODUCTS | M:1 | Many order items reference one product |
+| **belongs_to** | PRODUCTS → CATEGORIES | M:1 | Many products belong to one category |
+| **has_cart** | USERS → CART | 1:M | One user can have many cart items |
+| **cart_contains** | CART → PRODUCTS | M:1 | Many cart items reference one product |
+
+---
+
+### 5.2 Mapping Algorithm (ER Schema → Relational Schema)
+
+The mapping algorithm transforms the conceptual ER model into a logical relational schema following standard database design rules.
+
+#### 5.2.1 Mapping Rules Applied
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                           ER TO RELATIONAL MAPPING ALGORITHM                            │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Map Regular Entity Types                                                        │
+│                                                                                         │
+│ Rule: Each strong entity becomes a relation with all simple attributes                  │
+│                                                                                         │
+│ ┌─────────────────┐         ┌─────────────────────────────────────────────────────┐    │
+│ │ USERS (Entity)  │ ──────> │ users (id, email, password, first_name, last_name,  │    │
+│ └─────────────────┘         │        phone, address, role, created_at)            │    │
+│                             └─────────────────────────────────────────────────────┘    │
+│                                                                                         │
+│ ┌─────────────────┐         ┌─────────────────────────────────────────────────────┐    │
+│ │ CATEGORIES      │ ──────> │ categories (id, name, slug, description, image)     │    │
+│ │ (Entity)        │         └─────────────────────────────────────────────────────┘    │
+│ └─────────────────┘                                                                     │
+│                                                                                         │
+│ ┌─────────────────┐         ┌─────────────────────────────────────────────────────┐    │
+│ │ PRODUCTS        │ ──────> │ products (id, name, slug, description, price,       │    │
+│ │ (Entity)        │         │          stock_quantity, image, requires_prescription│    │
+│ └─────────────────┘         │          dosage_info, is_active, created_at)        │    │
+│                             └─────────────────────────────────────────────────────┘    │
+│                                                                                         │
+│ ┌─────────────────┐         ┌─────────────────────────────────────────────────────┐    │
+│ │ ORDERS (Entity) │ ──────> │ orders (id, total_amount, status, shipping_address, │    │
+│ └─────────────────┘         │         prescription_file, notes, created_at)       │    │
+│                             └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: Map 1:M (One-to-Many) Relationships                                             │
+│                                                                                         │
+│ Rule: Add foreign key to the "Many" side referencing the "One" side's primary key      │
+│                                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│ │ Relationship: USERS (1) ─────places─────> (M) ORDERS                            │    │
+│ │                                                                                 │    │
+│ │ Result: Add user_id as FK in orders table                                       │    │
+│ │         orders (..., user_id FK → users.id, ...)                                │    │
+│ └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│ │ Relationship: CATEGORIES (1) ─────contains─────> (M) PRODUCTS                   │    │
+│ │                                                                                 │    │
+│ │ Result: Add category_id as FK in products table                                 │    │
+│ │         products (..., category_id FK → categories.id, ...)                     │    │
+│ └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│ │ Relationship: ORDERS (1) ─────contains─────> (M) ORDER_ITEMS                    │    │
+│ │                                                                                 │    │
+│ │ Result: Add order_id as FK in order_items table                                 │    │
+│ │         order_items (..., order_id FK → orders.id, ...)                         │    │
+│ └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│ │ Relationship: PRODUCTS (1) ─────referenced_in─────> (M) ORDER_ITEMS             │    │
+│ │                                                                                 │    │
+│ │ Result: Add product_id as FK in order_items table                               │    │
+│ │         order_items (..., product_id FK → products.id, ...)                     │    │
+│ └─────────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: Map Associative Entity (CART - Optional Participation)                          │
+│                                                                                         │
+│ Rule: CART represents a ternary relationship with optional user participation           │
+│                                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│ │ Special Case: CART with optional user (guest cart support)                      │    │
+│ │                                                                                 │    │
+│ │ USERS (0..1) ←─────has_cart─────> (M) CART (M) ←─────contains─────> (1) PRODUCTS│    │
+│ │                                                                                 │    │
+│ │ Result: cart (id, user_id FK (NULLABLE), session_id, product_id FK, ...)        │    │
+│ │                                                                                 │    │
+│ │ • user_id is NULLABLE to support guest users (identified by session_id)         │    │
+│ │ • Either user_id OR session_id must be present (application-level constraint)   │    │
+│ └─────────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: Define Primary Keys                                                             │
+│                                                                                         │
+│ Rule: Each relation must have a primary key (surrogate key chosen: AUTO_INCREMENT id)   │
+│                                                                                         │
+│ ┌──────────────────┬───────────────────────────────────────────────────────────────┐   │
+│ │ Relation         │ Primary Key                                                   │   │
+│ ├──────────────────┼───────────────────────────────────────────────────────────────┤   │
+│ │ users            │ id (INT, AUTO_INCREMENT)                                      │   │
+│ │ categories       │ id (INT, AUTO_INCREMENT)                                      │   │
+│ │ products         │ id (INT, AUTO_INCREMENT)                                      │   │
+│ │ orders           │ id (INT, AUTO_INCREMENT)                                      │   │
+│ │ order_items      │ id (INT, AUTO_INCREMENT)                                      │   │
+│ │ cart             │ id (INT, AUTO_INCREMENT)                                      │   │
+│ └──────────────────┴───────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: Define Referential Integrity Constraints (ON DELETE Actions)                    │
+│                                                                                         │
+│ Rule: Define what happens when referenced record is deleted                             │
+│                                                                                         │
+│ ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│ │ Foreign Key              │ References       │ ON DELETE Action  │ Rationale      │   │
+│ ├──────────────────────────┼──────────────────┼───────────────────┼────────────────┤   │
+│ │ products.category_id     │ categories.id    │ CASCADE           │ Delete products│   │
+│ │                          │                  │                   │ with category  │   │
+│ ├──────────────────────────┼──────────────────┼───────────────────┼────────────────┤   │
+│ │ orders.user_id           │ users.id         │ CASCADE           │ Delete orders  │   │
+│ │                          │                  │                   │ with user      │   │
+│ ├──────────────────────────┼──────────────────┼───────────────────┼────────────────┤   │
+│ │ order_items.order_id     │ orders.id        │ CASCADE           │ Delete items   │   │
+│ │                          │                  │                   │ with order     │   │
+│ ├──────────────────────────┼──────────────────┼───────────────────┼────────────────┤   │
+│ │ order_items.product_id   │ products.id      │ CASCADE           │ Delete items   │   │
+│ │                          │                  │                   │ with product   │   │
+│ ├──────────────────────────┼──────────────────┼───────────────────┼────────────────┤   │
+│ │ cart.user_id             │ users.id         │ CASCADE           │ Clear cart     │   │
+│ │                          │                  │                   │ with user      │   │
+│ ├──────────────────────────┼──────────────────┼───────────────────┼────────────────┤   │
+│ │ cart.product_id          │ products.id      │ CASCADE           │ Remove from    │   │
+│ │                          │                  │                   │ cart if deleted│   │
+│ └──────────────────────────┴──────────────────┴───────────────────┴────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 5.3 Relational Schema
+
+The final relational schema resulting from the mapping algorithm.
+
+#### 5.3.1 Schema Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              PHARMACARE RELATIONAL SCHEMA                               │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                      users                                              │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│  PK   │ id          │ INT            │ AUTO_INCREMENT                                   │
+│       │ email       │ VARCHAR(255)   │ NOT NULL, UNIQUE                                 │
+│       │ password    │ VARCHAR(255)   │ NOT NULL                                         │
+│       │ first_name  │ VARCHAR(100)   │ NOT NULL                                         │
+│       │ last_name   │ VARCHAR(100)   │ NOT NULL                                         │
+│       │ phone       │ VARCHAR(20)    │ NULL                                             │
+│       │ address     │ TEXT           │ NULL                                             │
+│       │ role        │ ENUM           │ ('customer', 'admin') DEFAULT 'customer'         │
+│       │ created_at  │ TIMESTAMP      │ DEFAULT CURRENT_TIMESTAMP                        │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+                                            │
+                                            │ 1
+                                            │
+                            ┌───────────────┴───────────────┐
+                            │                               │
+                            │ M                             │ M (optional)
+                            ▼                               ▼
+┌─────────────────────────────────────────┐   ┌─────────────────────────────────────────┐
+│              orders                      │   │                cart                     │
+├─────────────────────────────────────────┤   ├─────────────────────────────────────────┤
+│  PK   │ id               │ INT          │   │  PK   │ id          │ INT               │
+│  FK   │ user_id          │ INT NOT NULL │   │  FK   │ user_id     │ INT NULL          │
+│       │ total_amount     │ DECIMAL(10,2)│   │       │ session_id  │ VARCHAR(255) NULL │
+│       │ status           │ ENUM         │   │  FK   │ product_id  │ INT NOT NULL      │
+│       │ shipping_address │ TEXT NOT NULL│   │       │ quantity    │ INT DEFAULT 1     │
+│       │ prescription_file│ VARCHAR(255) │   │       │ created_at  │ TIMESTAMP         │
+│       │ notes            │ TEXT         │   └───────┴─────────────┴───────────────────┘
+│       │ created_at       │ TIMESTAMP    │                         │
+└───────┴──────────────────┴──────────────┘                         │
+            │                                                       │
+            │ 1                                                     │
+            │                                                       │
+            │ M                                                     │
+            ▼                                                       │
+┌─────────────────────────────────────────┐                         │
+│           order_items                    │                         │
+├─────────────────────────────────────────┤                         │
+│  PK   │ id          │ INT               │                         │
+│  FK   │ order_id    │ INT NOT NULL      │                         │
+│  FK   │ product_id  │ INT NOT NULL      │────────────┐            │
+│       │ quantity    │ INT NOT NULL      │            │            │
+│       │ unit_price  │ DECIMAL(10,2)     │            │            │
+└───────┴─────────────┴───────────────────┘            │            │
+                                                       │            │
+                                                       │ M          │ M
+                                                       │            │
+                                                       ▼            │
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                     products                                            │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│  PK   │ id                    │ INT            │ AUTO_INCREMENT                         │
+│  FK   │ category_id           │ INT            │ NOT NULL                               │
+│       │ name                  │ VARCHAR(255)   │ NOT NULL                               │
+│       │ slug                  │ VARCHAR(255)   │ NOT NULL, UNIQUE                       │
+│       │ description           │ TEXT           │ NULL                                   │
+│       │ price                 │ DECIMAL(10,2)  │ NOT NULL                               │
+│       │ stock_quantity        │ INT            │ NOT NULL, DEFAULT 0                    │
+│       │ image                 │ VARCHAR(255)   │ NULL                                   │
+│       │ requires_prescription │ BOOLEAN        │ DEFAULT FALSE                          │
+│       │ dosage_info           │ TEXT           │ NULL                                   │
+│       │ is_active             │ BOOLEAN        │ DEFAULT TRUE                           │
+│       │ created_at            │ TIMESTAMP      │ DEFAULT CURRENT_TIMESTAMP              │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+                            │
+                            │ M
+                            │
+                            │ 1
+                            ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   categories                                            │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│  PK   │ id          │ INT            │ AUTO_INCREMENT                                   │
+│       │ name        │ VARCHAR(100)   │ NOT NULL                                         │
+│       │ slug        │ VARCHAR(100)   │ NOT NULL, UNIQUE                                 │
+│       │ description │ TEXT           │ NULL                                             │
+│       │ image       │ VARCHAR(255)   │ NULL                                             │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.3.2 Table Definitions Summary
+
+| Table | Primary Key | Foreign Keys | Description |
+|-------|-------------|--------------|-------------|
+| **users** | id | - | Stores customer and admin accounts |
+| **categories** | id | - | Product categories |
+| **products** | id | category_id → categories(id) | Product catalog |
+| **orders** | id | user_id → users(id) | Customer orders |
+| **order_items** | id | order_id → orders(id), product_id → products(id) | Order line items |
+| **cart** | id | user_id → users(id), product_id → products(id) | Shopping cart |
+
+#### 5.3.3 Indexes
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   DATABASE INDEXES                                      │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│  Index Name              │ Table       │ Column(s)    │ Purpose                         │
+├──────────────────────────┼─────────────┼──────────────┼─────────────────────────────────┤
+│  idx_products_category   │ products    │ category_id  │ Fast product filtering by       │
+│                          │             │              │ category                        │
+├──────────────────────────┼─────────────┼──────────────┼─────────────────────────────────┤
+│  idx_products_slug       │ products    │ slug         │ Fast product lookup by URL slug │
+├──────────────────────────┼─────────────┼──────────────┼─────────────────────────────────┤
+│  idx_orders_user         │ orders      │ user_id      │ Fast retrieval of user's orders │
+├──────────────────────────┼─────────────┼──────────────┼─────────────────────────────────┤
+│  idx_orders_status       │ orders      │ status       │ Fast filtering by order status  │
+├──────────────────────────┼─────────────┼──────────────┼─────────────────────────────────┤
+│  idx_cart_user           │ cart        │ user_id      │ Fast cart retrieval for users   │
+├──────────────────────────┼─────────────┼──────────────┼─────────────────────────────────┤
+│  idx_cart_session        │ cart        │ session_id   │ Fast cart retrieval for guests  │
+└──────────────────────────┴─────────────┴──────────────┴─────────────────────────────────┘
+```
+
+#### 5.3.4 Data Types and Constraints
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              DATA TYPES & CONSTRAINTS                                   │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+ENUM Types:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  users.role    = ENUM('customer', 'admin')                                              │
+│  orders.status = ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled')    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Unique Constraints:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  users.email           - Ensures no duplicate email registrations                       │
+│  categories.slug       - Ensures unique URL-friendly category identifiers               │
+│  products.slug         - Ensures unique URL-friendly product identifiers                │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+NOT NULL Constraints:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  users:       email, password, first_name, last_name                                    │
+│  categories:  name, slug                                                                │
+│  products:    category_id, name, slug, price, stock_quantity                            │
+│  orders:      user_id, total_amount, shipping_address                                   │
+│  order_items: order_id, product_id, quantity, unit_price                                │
+│  cart:        product_id, quantity                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Default Values:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  users.role                  = 'customer'                                               │
+│  products.stock_quantity     = 0                                                        │
+│  products.requires_prescription = FALSE                                                 │
+│  products.is_active          = TRUE                                                     │
+│  orders.status               = 'pending'                                                │
+│  cart.quantity               = 1                                                        │
+│  *.created_at                = CURRENT_TIMESTAMP                                        │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
